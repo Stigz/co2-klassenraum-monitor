@@ -93,7 +93,7 @@ resource "aws_iam_role_policy" "github" {
       {
         Sid    = "ManageProjectBucketsAndState"
         Effect = "Allow"
-        Action = ["s3:CreateBucket", "s3:DeleteBucket", "s3:GetBucket*", "s3:ListBucket", "s3:PutBucket*", "s3:DeleteBucket*", "s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:DeleteObject", "s3:ListBucketVersions"]
+        Action = ["s3:CreateBucket", "s3:DeleteBucket", "s3:GetBucket*", "s3:GetAccelerateConfiguration", "s3:ListBucket", "s3:PutBucket*", "s3:DeleteBucket*", "s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:DeleteObject", "s3:ListBucketVersions"]
         Resource = [
           "arn:aws:s3:::${var.project_name}-*",
           "arn:aws:s3:::${var.project_name}-*/*"
@@ -108,7 +108,7 @@ resource "aws_iam_role_policy" "github" {
       {
         Sid      = "ManageProjectLambda"
         Effect   = "Allow"
-        Action   = ["lambda:CreateFunction", "lambda:DeleteFunction", "lambda:Get*", "lambda:ListTags", "lambda:TagResource", "lambda:UntagResource", "lambda:UpdateFunctionCode", "lambda:UpdateFunctionConfiguration", "lambda:AddPermission", "lambda:RemovePermission"]
+        Action   = ["lambda:CreateFunction", "lambda:DeleteFunction", "lambda:Get*", "lambda:ListTags", "lambda:ListVersionsByFunction", "lambda:TagResource", "lambda:UntagResource", "lambda:UpdateFunctionCode", "lambda:UpdateFunctionConfiguration", "lambda:AddPermission", "lambda:RemovePermission"]
         Resource = "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-*"
       },
       {
