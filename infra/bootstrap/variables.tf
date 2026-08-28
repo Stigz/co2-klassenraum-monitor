@@ -17,3 +17,13 @@ variable "github_repository" {
   type    = string
   default = "co2-klassenraum-monitor"
 }
+
+variable "github_owner_id" {
+  type    = number
+  default = 8094202
+}
+
+variable "github_repository_id" {
+  type    = number
+  default = 1349392858
+}
