@@ -1,0 +1,92 @@
+name: Testen und auf AWS veröffentlichen
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Quellcode laden
+        uses: actions/checkout@v7
+
+      - name: Go einrichten
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.26.x'
+          cache-dependency-path: backend/go.sum
+
+      - name: Go testen und Lambda bauen
+        working-directory: backend
+        run: |
+          go test ./...
+          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bootstrap ./cmd/api
+          zip -j lambda.zip bootstrap
+          rm bootstrap
+
+      - name: AWS sicher über GitHub OIDC anmelden
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform einrichten
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.5.7
+          terraform_wrapper: false
+
+      - name: Infrastruktur prüfen und anwenden
+        working-directory: infra
+        run: |
+          terraform init -backend-config=backend.hcl
+          terraform fmt -check -recursive
+          terraform validate
+          terraform apply -auto-approve
+
+      - name: Infrastruktur-Ausgaben lesen
+        id: outputs
+        working-directory: infra
+        run: |
+          echo "api_url=$(terraform output -raw api_url)" >> "$GITHUB_OUTPUT"
+          echo "site_bucket=$(terraform output -raw site_bucket)" >> "$GITHUB_OUTPUT"
+          echo "distribution_id=$(terraform output -raw cloudfront_distribution_id)" >> "$GITHUB_OUTPUT"
+          echo "website_url=$(terraform output -raw website_url)" >> "$GITHUB_OUTPUT"
+
+      - name: Node.js einrichten
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: React testen und bauen
+        working-directory: frontend
+        env:
+          VITE_API_URL: ${{ steps.outputs.outputs.api_url }}
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      - name: Webseite veröffentlichen
+        run: |
+          aws s3 sync frontend/dist/ "s3://${{ steps.outputs.outputs.site_bucket }}" --delete --cache-control "public,max-age=3600"
+          aws s3 cp frontend/dist/index.html "s3://${{ steps.outputs.outputs.site_bucket }}/index.html" --cache-control "no-cache,no-store,must-revalidate" --content-type "text/html"
+          aws cloudfront create-invalidation --distribution-id "${{ steps.outputs.outputs.distribution_id }}" --paths '/*'
+
+      - name: Adresse zusammenfassen
+        run: echo "### Webseite ${{ steps.outputs.outputs.website_url }}" >> "$GITHUB_STEP_SUMMARY"

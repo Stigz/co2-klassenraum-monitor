@@ -1,0 +1,14 @@
+frontend/node_modules/
+frontend/dist/
+backend/bootstrap
+backend/lambda.zip
+infra/.terraform/
+infra/bootstrap/.terraform/
+infra/*.tfstate*
+infra/bootstrap/*.tfstate*
+infra/*.tfplan
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
